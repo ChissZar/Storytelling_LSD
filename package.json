@@ -1,0 +1,7 @@
+{
+  "name": "doi-moi-scrollytelling",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Chuyên đề Lịch sử Đảng: 40 năm Đổi mới",
+  "scripts": { "start": "node server.cjs", "test": "node checks/verify.cjs" }
+}
