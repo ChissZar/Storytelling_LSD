@@ -92,13 +92,89 @@ function updateProgress(){
     }
   }
 
+  // 5. Đồng bộ tức thì mốc năm lịch sử và lát cắt tăng trưởng GDP theo vị trí cuộn
+  syncTimelineYear();
+  syncGrowthPhase();
+
   ticking=false;
 }
+
+function syncGrowthPhase(){
+  if(innerWidth<=760)return;
+  const growthEl=$('#tang-truong');
+  if(!growthEl)return;
+  const gRect=growthEl.getBoundingClientRect();
+  const vh=window.innerHeight;
+  if(gRect.top>vh||gRect.bottom<0)return;
+  const growthSteps=$$('.growth-step');
+  if(!growthSteps.length)return;
+  const focalY=vh*0.46;
+  let activePhase=null;
+  for(const step of growthSteps){
+    const rect=step.getBoundingClientRect();
+    if(rect.top<=focalY && rect.bottom>=focalY){
+      activePhase=step.dataset.phase;
+      break;
+    }
+  }
+  if(!activePhase){
+    const firstRect=growthSteps[0].getBoundingClientRect();
+    const lastRect=growthSteps[growthSteps.length-1].getBoundingClientRect();
+    if(firstRect.top>focalY && firstRect.top<vh){
+      activePhase=growthSteps[0].dataset.phase;
+    } else if(lastRect.top<=focalY){
+      activePhase=growthSteps[growthSteps.length-1].dataset.phase;
+    }
+  }
+  if(activePhase){
+    setPhase(activePhase);
+  }
+}
+
+function syncTimelineYear(){
+  const journeyEl=$('#hanh-trinh');
+  if(!journeyEl)return;
+  const jRect=journeyEl.getBoundingClientRect();
+  const vh=window.innerHeight;
+  if(jRect.top>vh||jRect.bottom<0)return;
+  const steps=$$('.timeline-step');
+  if(!steps.length)return;
+  const focalY=vh*0.44;
+  let activeTimeline=null;
+  for(const step of steps){
+    const rect=step.getBoundingClientRect();
+    if(rect.top<=focalY && rect.bottom>=focalY){
+      activeTimeline=step;
+      break;
+    }
+  }
+  if(!activeTimeline){
+    const firstRect=steps[0].getBoundingClientRect();
+    const lastRect=steps[steps.length-1].getBoundingClientRect();
+    if(firstRect.top>focalY && firstRect.top<vh) activeTimeline=steps[0];
+    else if(lastRect.top<=focalY) activeTimeline=steps[steps.length-1];
+  }
+  if(activeTimeline){
+    const year=activeTimeline.dataset.year;
+    const yEl=$('#active-year');
+    if(yEl&&yEl.textContent!==year){
+      yEl.classList.add('year-changing');
+      setTimeout(()=>{yEl.textContent=year;yEl.classList.remove('year-changing');},120);
+    }
+    $$('.timeline-dots a').forEach(a=>{
+      const active=a.hash==='#'+activeTimeline.id;
+      a.classList.toggle('active',active);
+      if(active)a.setAttribute('aria-current','step');
+      else a.removeAttribute('aria-current');
+    });
+  }
+}
+
 window.addEventListener('scroll',()=>{if(!ticking){requestAnimationFrame(updateProgress);ticking=true;}},{passive:true});window.addEventListener('resize',updateProgress);updateProgress();
 if('IntersectionObserver' in window){
- const timelineObserver=new IntersectionObserver(entries=>{entries.filter(e=>e.isIntersecting).forEach(e=>{const yEl=$('#active-year');if(yEl&&yEl.textContent!==e.target.dataset.year){yEl.classList.add('year-changing');setTimeout(()=>{yEl.textContent=e.target.dataset.year;yEl.classList.remove('year-changing');},120);}else if(yEl){yEl.textContent=e.target.dataset.year;}$$('.timeline-dots a').forEach(a=>{const active=a.hash==='#'+e.target.id;a.classList.toggle('active',active);if(active)a.setAttribute('aria-current','step');else a.removeAttribute('aria-current');});});},{rootMargin:'-25% 0px -40% 0px',threshold:0});
+ const timelineObserver=new IntersectionObserver(()=>{syncTimelineYear();},{rootMargin:'-20% 0px -35% 0px',threshold:[0,0.5,1]});
  $$('.timeline-step').forEach(el=>timelineObserver.observe(el));
- const growthObserver=new IntersectionObserver(entries=>{if(innerWidth>760)entries.filter(e=>e.isIntersecting).forEach(e=>setPhase(e.target.dataset.phase));},{rootMargin:'-30% 0px -40% 0px',threshold:0});
+ const growthObserver=new IntersectionObserver(()=>{if(innerWidth>760)syncGrowthPhase();},{rootMargin:'-20% 0px -35% 0px',threshold:[0,0.5,1]});
  $$('.growth-step').forEach(el=>growthObserver.observe(el));
  const chapterObserver=new IntersectionObserver(entries=>{entries.filter(e=>e.isIntersecting).forEach(e=>{$$('.chapter-nav a').forEach(a=>{const active=a.hash==='#'+e.target.id;a.classList.toggle('active',active);if(active)a.setAttribute('aria-current','location');else a.removeAttribute('aria-current');});});},{rootMargin:'-20% 0px -60% 0px',threshold:0});
  $$('.chapter-nav a').forEach(a=>chapterObserver.observe($(a.hash)));
@@ -106,4 +182,4 @@ if('IntersectionObserver' in window){
  const revealObserver=new IntersectionObserver((entries,obs)=>{entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add('is-visible');obs.unobserve(entry.target);}});},{rootMargin:'0px 0px -40px 0px',threshold:0.1});
  $$('.reveal, .poverty-figure').forEach(el=>revealObserver.observe(el));
 }
-$('#quiz-form').addEventListener('submit',e=>{e.preventDefault();const form=new FormData(e.target);const answers=['a','b','b'];let score=0;const explanations=['Đại hội VI (1986) đề ra đường lối đổi mới toàn diện.','16,8 − 5,0 = 11,8 điểm phần trăm; mức giảm tương đối khoảng 70,2%.','Biểu đồ mô tả biến động; xác định tác động riêng của một quyết sách cần thiết kế nghiên cứu và bằng chứng bổ sung.'];const rows=answers.map((answer,i)=>{const ok=form.get('q'+(i+1))===answer;if(ok)score++;return `<li><strong>${ok?'Đúng':'Chưa đúng'}.</strong> ${explanations[i]}</li>`;}).join('');const res=$('#quiz-result');res.innerHTML=`<strong>Bạn trả lời đúng ${score}/3 câu.</strong><ol>${rows}</ol>`;res.classList.remove('show');void res.offsetWidth;res.classList.add('show');});
+$('#quiz-form').addEventListener('submit',e=>{e.preventDefault();const form=new FormData(e.target);const answers=['a','b','b'];let score=0;const explanations=['Đại hội VI (1986) xác định 3 chương trình kinh tế lớn: lương thực – thực phẩm, hàng tiêu dùng và hàng xuất khẩu (Giáo trình tr.170, câu 14 tr.203).','Đại hội IX (2001) chính thức xác định kinh tế thị trường định hướng XHCN là mô hình kinh tế tổng quát (Giáo trình tr.180, câu 10 tr.202).','Đại hội XIII xác định mục tiêu 2030 (100 năm thành lập Đảng) là nước đang phát triển có công nghiệp hiện đại, thu nhập trung bình cao; đến 2045 mới là nước phát triển, thu nhập cao (Giáo trình tr.193, câu 24 tr.205).'];const rows=answers.map((answer,i)=>{const ok=form.get('q'+(i+1))===answer;if(ok)score++;return `<li><strong>${ok?'Đúng':'Chưa đúng'}.</strong> ${explanations[i]}</li>`;}).join('');const res=$('#quiz-result');res.innerHTML=`<strong>Bạn trả lời đúng ${score}/3 câu.</strong><ol>${rows}</ol>`;res.classList.remove('show');void res.offsetWidth;res.classList.add('show');});
